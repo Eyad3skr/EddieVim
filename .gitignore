@@ -1,0 +1,9 @@
+﻿# Neovim cache/data (never commit)
+../nvim-data/
+# Logs, backups, swap
+*.log
+*.swp
+*.swo
+# OS junk
+Thumbs.db
+.DS_Store
