@@ -5,6 +5,18 @@ vim.cmd("set softtabstop=2")
 vim.cmd("set shiftwidth=2")
 vim.g.mapleader = " "
 vim.o.completeopt = "menu,menuone,noselect"
+-- Line numbers
+vim.opt.number = true
+vim.opt.relativenumber = true
+
+-- Step jumps
+vim.keymap.set('n', '<C-j>', '5j', { noremap = true, silent = true, desc = 'Jump down 5 lines' })
+vim.keymap.set('n', '<C-k>', '5k', { noremap = true, silent = true, desc = 'Jump up 5 lines' })
+
+-- Smarter j/k for wrapped lines
+vim.keymap.set('n', 'j', 'v:count == 0 ? "gj" : "j"', { expr = true, silent = true })
+vim.keymap.set('n', 'k', 'v:count == 0 ? "gk" : "k"', { expr = true, silent = true })
+
 
 -- Ensure lazy.nvim is loaded
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
@@ -73,15 +85,61 @@ local plugins = {
     --toggle terminal plugin
     {'akinsho/toggleterm.nvim', version = "*", config = true}
   },
+  { 
+  "zbirenbaum/copilot.lua",
+  cmd = "Copilot",
+  build = ":Copilot auth",
+  },
+
+  -- Copilot ↔ nvim-cmp bridge
+  {
+    "zbirenbaum/copilot-cmp",
+    dependencies = { "zbirenbaum/copilot.lua" },
+  },
 }
 
 -- Lazy.nvim setup
-require("lazy").setup(plugins)
+require("lazy").setup(plugins, {
+  rocks = {
+    enabled = false,
+  },
+})
+
+-- Copilot core
+require("copilot").setup({
+  suggestion = {
+    enabled = true,
+    auto_trigger = true,        -- pop suggestions as you type
+    debounce = 150,
+    keymap = {
+      accept = "<C-l>",         -- accept suggestion
+      next = "<M-]>",           -- next suggestion (Alt+])
+      prev = "<M-[>",           -- previous suggestion (Alt+[)
+      dismiss = "<C-]>",        -- dismiss inline suggestion
+    },
+  },
+  panel = { enabled = false },  -- keep the side panel off (inline only)
+  filetypes = {
+    -- enable everywhere by default
+    ["*"] = true,
+    -- examples if you want to disable in some places:
+    -- markdown = false,
+    -- sql = false,
+  },
+})
+
+-- Make Copilot a completion source for nvim-cmp
+require("copilot_cmp").setup()
+
 
 -- Mason Setup
 require("mason").setup()
 require("mason-lspconfig").setup({
   ensure_installed = { "lua_ls", "biome", "clangd", "rust_analyzer", "jdtls", "pyright" },
+})
+
+require("neo-tree").setup({
+  log_level = "info",   -- or "warn", "error"
 })
 
 -- Alpha.nvim Configuration
@@ -176,7 +234,9 @@ lspconfig.rust_analyzer.setup({
   settings = {
     ["rust-analyzer"] = {
       cargo = { allFeatures = true },
-      checkOnSave = { command = "clippy" },
+      check = { command = "clippy" },  -- run clippy on save
+      -- optional:
+      -- check = { command = "clippy", extraArgs = { "--", "-W", "clippy::all" } },
     },
   },
 })
@@ -231,9 +291,34 @@ require("telescope").setup {
 }
 require("telescope").load_extension("ui-select")
 
-vim.keymap.set('n', '<C-p>', require("telescope.builtin").find_files, {})
-vim.keymap.set('n', '<leader>fg', require("telescope.builtin").live_grep, { desc = 'Telescope live grep' })
-vim.keymap.set('n', '<C-n>', ':Neotree filesystem reveal left<CR>')
+-- Keymap helper (keep this once)
+local map = function(mode, lhs, rhs, desc)
+  vim.keymap.set(mode, lhs, rhs, { noremap = true, silent = true, desc = desc })
+end
+
+-- === Telescope (project-wide) ===
+map('n', '<leader>f', require('telescope.builtin').find_files, 'Find Files')
+map('n', '<leader>/', require('telescope.builtin').live_grep,  'Live Grep (project)')
+map('n', '<leader>b', require('telescope.builtin').buffers,    'Buffers')
+map('n', '<leader>h', require('telescope.builtin').help_tags,  'Help')
+
+-- Optional: search word under cursor across project
+map('n', '<leader>*', require('telescope.builtin').grep_string, 'Grep word under cursor')
+
+-- Optional: search only in current buffer
+map('n', '<leader>sb', require('telescope.builtin').current_buffer_fuzzy_find, 'Search in buffer')
+
+-- Keep (or remove) your legacy Ctrl+P if you want
+map('n', '<C-p>', require('telescope.builtin').find_files, 'Find Files (legacy)')
+
+
+-- Telescope
+map('n', '<C-p>',        require('telescope.builtin').find_files, 'Find Files (legacy)')
+
+-- Neo-tree (folder tree)
+map('n', '<C-n>', function()
+  vim.cmd('Neotree filesystem reveal left')
+end, 'Neo-tree: Reveal Left')
 
 function _G.set_toggleterm_dir(dir)
   vim.cmd("ToggleTerm size=20 direction=horizontal dir=" .. dir)
@@ -280,6 +365,7 @@ cmp.setup({
     ["<CR>"] = cmp.mapping.confirm({ select = true }), -- Accept currently selected item
   }),
   sources = cmp.config.sources({
+    { name = "copilot",  group_index = 2, priority = 90 },
     { name = "nvim_lsp" },
     { name = "luasnip" },
   }, {
