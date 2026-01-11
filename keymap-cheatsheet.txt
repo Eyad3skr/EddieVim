@@ -1,0 +1,117 @@
+*keymap-cheatsheet*  Personal Neovim & Workflow Cheatsheet
+
+==============================================================================
+Essentials (built-in Vim behavior)                             *vim-essentials*
+
+Undo:                  u
+Redo:                  Ctrl+r
+Paste after cursor:    p
+Paste before cursor:   P
+Copy (yank):           y
+Delete (cut):          d
+Visual mode:           v
+Save file:             :w
+Quit:                  :q
+Save & quit:           :wq
+Force quit:            :q!
+
+Clipboard:
+  System clipboard is enabled via unnamedplus.
+  "+y  yank to system clipboard explicitly
+  "+p  paste from system clipboard explicitly
+
+==============================================================================
+Windows Terminal Panes (Multiplexer)                            *wt-panes*
+
+Split pane (vertical):      Alt+Shift+=
+Split pane (horizontal):    Alt+Shift+-
+Close pane:                 Ctrl+Shift+W
+Switch panes:               Alt+Arrow keys
+Resize panes:               Alt+Shift+Arrow keys
+
+Typical layout:
+  Pane 1: nvim
+  Pane 2: claude
+  Pane 3: shell / tests
+
+==============================================================================
+Leader key                                                       *leader-key*
+
+Leader is set to:
+  <Space>
+
+==============================================================================
+Movement Enhancements                                           *movement*
+
+Ctrl+j        Jump down 5 lines
+Ctrl+k        Jump up 5 lines
+
+j / k         Smart wrapped-line movement (gj / gk automatically)
+
+==============================================================================
+Terminal (ToggleTerm + terminal buffers)                        *terminal-keys*
+
+Esc (in terminal mode)     Exit terminal mode to Normal mode
+
+Ctrl+h (terminal mode)      Move to left split
+Ctrl+j (terminal mode)      Move to bottom split
+Ctrl+k (terminal mode)      Move to top split
+Ctrl+l (terminal mode)      Move to right split
+
+Ctrl+t (normal mode)        Open ToggleTerm, asks for directory
+
+==============================================================================
+Telescope (search & navigation)                                 *telescope-keys*
+
+Fast IDE-style:
+  Ctrl+f        Find files
+  Ctrl+g        Live grep (search project)
+  Ctrl+p        Find files (legacy binding)
+
+Leader-based:
+  Space f f     Find files
+  Space f g     Live grep (project search)
+  Space f b     Buffers
+  Space f h     Help tags
+  Space *       Grep word under cursor (project)
+  Space s b     Search inside current buffer
+
+==============================================================================
+File Tree (Neo-tree)                                            *neotree-keys*
+
+Ctrl+n        Open file tree (left side)
+
+==============================================================================
+Copilot (inline AI suggestions)                                 *copilot-keys*
+
+Ctrl+l        Accept suggestion
+Alt+]         Next suggestion
+Alt+[         Previous suggestion
+Ctrl+]        Dismiss suggestion
+
+==============================================================================
+Completion (nvim-cmp)                                           *completion-keys*
+
+Ctrl+Space    Trigger completion menu
+Enter         Confirm completion
+Ctrl+e        Abort completion
+Ctrl+b        Scroll docs up
+Ctrl+f        Scroll docs down
+
+==============================================================================
+Colorscheme                                                       *theme-info*
+
+Theme: kanagawa.nvim
+Active style: kanagawa-wave
+
+==============================================================================
+Notes                                                             *notes*
+
+- This help page is custom and editable.
+- File location:
+    ~/.config/nvim/doc/keymap-cheatsheet.txt
+- After editing, regenerate help tags with:
+    :helptags ALL
+
+Open this page anytime with:
+    :help keymap-cheatsheet

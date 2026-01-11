@@ -17,6 +17,14 @@ vim.keymap.set('n', '<C-k>', '5k', { noremap = true, silent = true, desc = 'Jump
 vim.keymap.set('n', 'j', 'v:count == 0 ? "gj" : "j"', { expr = true, silent = true })
 vim.keymap.set('n', 'k', 'v:count == 0 ? "gk" : "k"', { expr = true, silent = true })
 
+-- Leave terminal mode easily
+vim.keymap.set('t', '<Esc>', [[<C-\><C-n>]], { desc = "Exit terminal mode" })
+
+-- Allow moving between splits from terminal
+vim.keymap.set('t', '<C-h>', [[<C-\><C-n><C-w>h]])
+vim.keymap.set('t', '<C-j>', [[<C-\><C-n><C-w>j]])
+vim.keymap.set('t', '<C-k>', [[<C-\><C-n><C-w>k]])
+vim.keymap.set('t', '<C-l>', [[<C-\><C-n><C-w>l]])
 
 -- Ensure lazy.nvim is loaded
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
@@ -37,6 +45,10 @@ local plugins = {
   { "nvim-treesitter/nvim-treesitter", build = ":TSUpdate" },
   { "nvim-lua/plenary.nvim" },
   {"nvim-treesitter/playground"},
+  { "windwp/nvim-autopairs" },
+  { "windwp/nvim-ts-autotag" },
+  { "numToStr/Comment.nvim", opts = {} },
+  { "coder/claudecode.nvim", dependencies = { "nvim-lua/plenary.nvim" } },
   {
     'nvim-telescope/telescope.nvim', 
     tag = '0.1.8',
@@ -66,7 +78,7 @@ local plugins = {
     "jay-babu/mason-null-ls.nvim",
     dependencies = { "williamboman/mason.nvim", "nvimtools/none-ls.nvim" },
   },
-  { "catppuccin/nvim", name = "catppuccin", priority = 1000 },
+  { "rebelot/kanagawa.nvim", priority = 1000 },
   -- Auto-completion plugins
   { "hrsh7th/nvim-cmp" },
   { "hrsh7th/cmp-nvim-lsp" },
@@ -132,6 +144,30 @@ require("copilot").setup({
 require("copilot_cmp").setup()
 
 
+-- Indentation behaviour
+vim.opt.autoindent = true
+vim.opt.smartindent = true  -- smarter {}-aware indent for many langs
+
+-- Treesitter autotag (optional; for HTML/TSX)
+require("nvim-treesitter.configs").setup({
+  -- keep your existing ensure_installed / highlight / indent...
+  autotag = { enable = true },
+})
+
+-- nvim-autopairs
+require("nvim-autopairs").setup({
+  check_ts = true,        -- use treesitter awareness
+  enable_check_bracket_line = true,
+  fast_wrap = {},
+})
+
+-- integrate autopairs with nvim-cmp
+local cmp_ok, cmp = pcall(require, "cmp")
+if cmp_ok then
+  local cmp_autopairs = require("nvim-autopairs.completion.cmp")
+  cmp.event:on("confirm_done", cmp_autopairs.on_confirm_done())
+end
+
 -- Mason Setup
 require("mason").setup()
 require("mason-lspconfig").setup({
@@ -140,6 +176,10 @@ require("mason-lspconfig").setup({
 
 require("neo-tree").setup({
   log_level = "info",   -- or "warn", "error"
+  filesystem = {
+    follow_current_file = { enabled = true },
+    use_libuv_file_watcher = true, -- enables real-time updates
+  },
 })
 
 -- Alpha.nvim Configuration
@@ -182,8 +222,7 @@ table.insert(dashboard.section.buttons.val, #dashboard.section.buttons.val + 1, 
 -- Footer (ASCII Art in Footer)
 dashboard.section.footer.val = {
   [[─────────────────────────────────────────────]],
-  [[✨ Ah yes, another masterpiece of spaghetti]],
-  [[code for future archaeologists to decipher ✨]],
+  [[        I came, I saw, I refactored. ⚔️]],
   [[─────────────────────────────────────────────]],
   [[       ⢀⡴⠑⡄⠀⠀⠀⠀⠀⠀⠀⣀⣀⣤⣤⣤⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀]],
   [[       ⠸⡇⠀⠿⡀⠀⠀⠀⣀⡴⢿⣿⣿⣿⣿⣿⣿⣿⣷⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀]],
@@ -214,7 +253,71 @@ alpha.setup(dashboard.config)
 -- parser_config.install_dir = vim.fn.stdpath("data") .. "/tree-sitter/parsers"
 
 -- LSP Setup  -----------------------------------------
-local lspconfig = require("lspconfig")
+-- local lspconfig = require("lspconfig")
+
+-- LSP Setup (Neovim 0.11+ native API) -------------------
+
+-- define ONCE
+local capabilities = require("cmp_nvim_lsp").default_capabilities()
+
+local on_attach = function(_, bufnr)
+  vim.keymap.set('n', 'K', vim.lsp.buf.hover, { buffer = bufnr })
+  vim.keymap.set('n', '<leader>gd', vim.lsp.buf.definition, { buffer = bufnr })
+  vim.keymap.set('n', '<leader>gr', vim.lsp.buf.references, { buffer = bufnr })
+end
+
+-- lua_ls
+vim.lsp.config("lua_ls", {
+  on_attach = on_attach,
+  capabilities = capabilities,
+})
+
+-- rust_analyzer (keep your special behavior)
+vim.lsp.config("rust_analyzer", {
+  on_attach = function(client, bufnr)
+    on_attach(client, bufnr)
+
+    vim.api.nvim_create_autocmd("BufWritePost", {
+      buffer = bufnr,
+      callback = function()
+        vim.lsp.buf.execute_command({
+          command = "rust-analyzer.reloadWorkspace",
+          arguments = {},
+        })
+      end,
+    })
+  end,
+  capabilities = capabilities,
+  settings = {
+    ["rust-analyzer"] = {
+      cargo = { allFeatures = true },
+      check = { command = "clippy" },
+      diagnostics = {
+        enable = true,
+        experimental = { enable = true },
+      },
+    },
+  },
+})
+
+-- jdtls
+vim.lsp.config("jdtls", {
+  on_attach = on_attach,
+  capabilities = capabilities,
+  cmd = { vim.fn.stdpath("data") .. "/mason/bin/jdtls" },
+})
+
+-- pyright
+vim.lsp.config("pyright", {
+  on_attach = on_attach,
+  capabilities = capabilities,
+  -- remove the hardcoded pythonPath unless you really need it
+  -- settings = { python = { pythonPath = "..." } },
+})
+
+-- finally: enable the servers
+vim.lsp.enable({ "lua_ls", "rust_analyzer", "jdtls", "pyright" })
+
 
 -- define ONCE (remove any duplicates elsewhere)
 local capabilities = require("cmp_nvim_lsp").default_capabilities()
@@ -225,34 +328,62 @@ local on_attach = function(client, bufnr)
   vim.keymap.set('n', '<leader>gr', vim.lsp.buf.references, { buffer = bufnr })
 end
 
--- servers all reuse the same capabilities
-lspconfig.lua_ls.setup({ on_attach = on_attach, capabilities = capabilities })
+-- rust-analyzer (Neovim 0.11+)
+vim.lsp.config("rust_analyzer", {
+  on_attach = function(client, bufnr)
+    -- your common LSP keymaps
+    vim.keymap.set('n', 'K', vim.lsp.buf.hover, { buffer = bufnr })
+    vim.keymap.set('n', '<leader>gd', vim.lsp.buf.definition, { buffer = bufnr })
+    vim.keymap.set('n', '<leader>gr', vim.lsp.buf.references, { buffer = bufnr })
 
-lspconfig.rust_analyzer.setup({
-  on_attach = on_attach,
-  capabilities = capabilities,
+    -- run clippy + update diagnostics after each save
+    vim.api.nvim_create_autocmd("BufWritePost", {
+      buffer = bufnr,
+      callback = function()
+        vim.lsp.buf.execute_command({
+          command = "rust-analyzer.reloadWorkspace",
+          arguments = {},
+        })
+      end,
+    })
+  end,
+
+  capabilities = require("cmp_nvim_lsp").default_capabilities(),
+
   settings = {
     ["rust-analyzer"] = {
       cargo = { allFeatures = true },
-      check = { command = "clippy" },  -- run clippy on save
-      -- optional:
-      -- check = { command = "clippy", extraArgs = { "--", "-W", "clippy::all" } },
+      check = { command = "clippy" },
+      diagnostics = {
+        enable = true,
+        experimental = { enable = true },
+      },
     },
   },
 })
 
-lspconfig.jdtls.setup({
+
+-- jdtls
+vim.lsp.config("jdtls", {
   on_attach = on_attach,
   capabilities = capabilities,
   cmd = { vim.fn.stdpath("data") .. "/mason/bin/jdtls" },
 })
 
-lspconfig.pyright.setup({
+-- pyright
+vim.lsp.config("pyright", {
   on_attach = on_attach,
   capabilities = capabilities,
-  settings = { python = { pythonPath = "/path/to/python3" } },
+  -- Only keep this if you really need a specific Python path:
+  -- settings = { python = { pythonPath = "/path/to/python3" } },
 })
 
+
+
+vim.lsp.enable({ "rust_analyzer", "jdtls", "pyright", "lua_ls" })
+
+-- servers all reuse the same capabilities
+vim.lsp.config("lua_ls", { on_attach = on_attach, capabilities = capabilities })
 
 
 -- === Treesitter on Windows: use prebuilt DLLs (no compiler) ===
@@ -296,11 +427,15 @@ local map = function(mode, lhs, rhs, desc)
   vim.keymap.set(mode, lhs, rhs, { noremap = true, silent = true, desc = desc })
 end
 
+-- Fast IDE-style bindings
+map('n', '<C-f>', require('telescope.builtin').find_files, 'Find Files')
+map('n', '<C-g>', require('telescope.builtin').live_grep,  'Live Grep (project)')
+
 -- === Telescope (project-wide) ===
-map('n', '<leader>f', require('telescope.builtin').find_files, 'Find Files')
-map('n', '<leader>/', require('telescope.builtin').live_grep,  'Live Grep (project)')
-map('n', '<leader>b', require('telescope.builtin').buffers,    'Buffers')
-map('n', '<leader>h', require('telescope.builtin').help_tags,  'Help')
+map('n', '<leader>ff', require('telescope.builtin').find_files, 'Find Files')
+map('n', '<leader>fg', require('telescope.builtin').live_grep,  'Find Grep (project)')
+map('n', '<leader>fb', require('telescope.builtin').buffers,    'Find Buffers')
+map('n', '<leader>fh', require('telescope.builtin').help_tags,  'Find Help')
 
 -- Optional: search word under cursor across project
 map('n', '<leader>*', require('telescope.builtin').grep_string, 'Grep word under cursor')
@@ -340,6 +475,19 @@ null.setup({
     null.builtins.diagnostics.eslint_d,  -- faster than eslint (or use eslint if you prefer)
   },
 })
+
+vim.diagnostic.config({
+  virtual_text = {
+    spacing = 2,
+    source = "if_many",   -- show source names when useful
+    severity_sort = true,
+  },
+  signs = true,
+  underline = true,
+  update_in_insert = false, -- don’t distract while typing
+  float = { border = "rounded", source = "always" },
+})
+
 
 -- (optional) auto-install those tools via Mason
 pcall(function()
@@ -395,8 +543,22 @@ vim.opt.clipboard = "unnamedplus"
 vim.opt.number = true
 vim.opt.relativenumber = false
 
-vim.g.catppuccin_flavour = "mocha"
+-- Colorscheme: Kanagawa
+require("kanagawa").setup({
+  compile = false, -- set true if you want faster startup (then run :KanagawaCompile)
+  undercurl = true,
+  commentStyle = { italic = true },
+  keywordStyle = { italic = true },
+  statementStyle = { bold = true },
+  transparent = false,
+  dimInactive = false,
+  terminalColors = true,
+  theme = "wave",  -- "wave", "dragon", "lotus"
+  background = {
+    dark = "wave",
+    light = "lotus",
+  },
+})
 
--- Colorscheme
-require("catppuccin").setup()
-vim.cmd("colorscheme catppuccin")
+vim.cmd("colorscheme kanagawa-wave") -- or kanagawa-dragon / kanagawa-lotus
+
